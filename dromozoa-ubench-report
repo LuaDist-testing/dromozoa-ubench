@@ -1,6 +1,6 @@
 #! /usr/bin/env lua
 
--- Copyright (C) 2015,2017 Tomoyuki Fujimori <moyu@dromozoa.com>
+-- Copyright (C) 2017 Tomoyuki Fujimori <moyu@dromozoa.com>
 --
 -- This file is part of dromozoa-ubench.
 --
@@ -17,15 +17,23 @@
 -- You should have received a copy of the GNU General Public License
 -- along with dromozoa-ubench.  If not, see <http://www.gnu.org/licenses/>.
 
+local read_file = require "dromozoa.commons.read_file"
+local uint32 = require "dromozoa.commons.uint32"
 local json = require "dromozoa.commons.json"
+local unix = require "dromozoa.unix"
 local ubench = require "dromozoa.ubench"
 
-local format = string.format
+local filename = ...
 
-local b = ubench()
-b.benchmarks = assert(loadfile(arg[1]))()
-
-local context = ubench.initialize()
-local results = b:run()
-context:terminate()
-io.write(json.encode(results, { pretty = true }), "\n")
+local dir = assert(filename:match("^(.+)%.json$"))
+local result, message, code = unix.mkdir(dir)
+if not result then
+  if code == unix.EEXIST then
+    if uint32.band(unix.stat(dir).st_mode, unix.S_IFMT) ~= unix.S_IFDIR then
+      error(unix.strerror(unix.ENOTDIR))
+    end
+  else
+    error(message)
+  end
+end
+ubench.report(json.decode(assert(read_file(filename))), dir)
